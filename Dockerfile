@@ -13,6 +13,8 @@ RUN apt-get update \
 		 python3-pip \
 		 cmake \
 		 gcc-arm-none-eabi \
+		 libnewlib-arm-none-eabi \
+		 libstdc++-arm-none-eabi-newlib \
 		 build-essential \
 		 git \
 	 && rm -rf /var/lib/apt/lists/*
