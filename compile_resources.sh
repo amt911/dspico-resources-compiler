@@ -454,6 +454,66 @@ step_assemble_sd() {
   info "✓ SD card assembled: $sd"
 }
 
+# ── [9/9] ntrboot firmware variants (optional) ───────────────────────────────
+
+step_firmware_ntrboot() {
+  step "9/$TOTAL_STEPS" "Build ntrboot firmware variants (optional)"
+
+  if [ "${ENABLE_NTRBOOT:-0}" != "1" ]; then
+    warn "⊗ Skipped (set ENABLE_NTRBOOT=1 to enable)"
+    return
+  fi
+
+  # LNH-team firmware has 2 ROM slots (default.nds + dsimode.nds), so each
+  # ntrboot variant needs its own separate firmware build.
+  local repo=/tmp/dspico-firmware-ntrboot
+  clone_repo https://github.com/LNH-team/dspico-firmware "$repo"
+  git submodule update --init
+  (cd pico-sdk && git submodule update --init)
+
+  local built_any=0
+
+  # 3DS ntrboot: boot9strap_ntr.firm → roms/default.nds
+  if [ -f /inputs/ntrboot/boot9strap_ntr.firm ]; then
+    info "Building 3DS ntrboot firmware..."
+    rm -f roms/*.nds
+    rm -rf build
+    cp -v /inputs/ntrboot/boot9strap_ntr.firm roms/default.nds
+    chmod +x compile.sh
+    ./compile.sh || error_exit "3DS ntrboot firmware compilation failed"
+    local uf2_3ds
+    uf2_3ds=$(find_artifact build "*.uf2")
+    cp -v "$uf2_3ds" "$OUT_BASE/firmware/DSpico_ntrboot_3ds.uf2"
+    built_any=1
+    info "  ✓ 3DS ntrboot → DSpico_ntrboot_3ds.uf2"
+  else
+    warn "  ⚠ 3DS ntrboot skipped: inputs/ntrboot/boot9strap_ntr.firm not found"
+  fi
+
+  # DSi ntrboot: default.gcd → roms/default.nds
+  if [ -f /inputs/ntrboot/default.gcd ]; then
+    info "Building DSi ntrboot firmware..."
+    rm -f roms/*.nds
+    rm -rf build
+    cp -v /inputs/ntrboot/default.gcd roms/default.nds
+    chmod +x compile.sh
+    ./compile.sh || error_exit "DSi ntrboot firmware compilation failed"
+    local uf2_dsi
+    uf2_dsi=$(find_artifact build "*.uf2")
+    cp -v "$uf2_dsi" "$OUT_BASE/firmware/DSpico_ntrboot_dsi.uf2"
+    built_any=1
+    info "  ✓ DSi ntrboot → DSpico_ntrboot_dsi.uf2"
+  else
+    warn "  ⚠ DSi ntrboot skipped: inputs/ntrboot/default.gcd not found"
+  fi
+
+  if [ "$built_any" = "0" ]; then
+    warn "⚠ ENABLE_NTRBOOT=1 but no ntrboot files found in inputs/ntrboot/"
+  fi
+
+  info "✓ ntrboot firmware variants built"
+}
+
 # =============================================================================
 #  Main
 # =============================================================================
@@ -471,6 +531,7 @@ main() {
   step_pico_loader
   step_pico_launcher
   step_assemble_sd
+  step_firmware_ntrboot
 
   # Build ntrboot firmware variant if enabled
   if [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
@@ -481,11 +542,8 @@ main() {
   info "════════════════════════════════════════"
   info "  All components built successfully!"
   if [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
-    info "  Firmware:      outputs/dspico/firmware/DSpico.uf2"
-    info "  ntrboot 3DS:   outputs/dspico/ntrboot/DSpico_ntrboot_3ds.uf2"
-    if [ -f "$OUT_BASE/ntrboot/DSpico_ntrboot_dsi.uf2" ]; then
-      info "  ntrboot DSi:   outputs/dspico/ntrboot/DSpico_ntrboot_dsi.uf2"
-    fi
+    [ -f "$OUT_BASE/firmware/DSpico_ntrboot_3ds.uf2" ] && info "  ntrboot 3DS: outputs/dspico/firmware/DSpico_ntrboot_3ds.uf2"
+    [ -f "$OUT_BASE/firmware/DSpico_ntrboot_dsi.uf2" ] && info "  ntrboot DSi: outputs/dspico/firmware/DSpico_ntrboot_dsi.uf2"
   fi
   info "════════════════════════════════════════"
   echo "Outputs: $OUT_BASE"

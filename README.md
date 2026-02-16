@@ -106,36 +106,13 @@ The `uartBufv060.bin` file will be automatically generated during the build proc
 
 ntrboot allows using DSpico as a **ntrboot flashcart** to install custom firmware ([boot9strap](https://3ds.hacks.guide/) on 3DS, or [Unlaunch](https://dsi.cfw.guide/) on DSi) **without any pre-existing software modification** on the target console.
 
-#### Why are there separate ntrboot firmwares for 3DS and DSi?
-
-The DSpico firmware has exactly **2 ROM slots** (`default.nds` for DS/3DS and `dsimode.nds` for DSi). However, the firmware serves `dsimode.nds` to **both** DSi and 3DS (it can't distinguish between them — both are "DSi mode" consoles). This means:
-
-- **3DS ntrboot** needs the boot9strap payload in `default.nds`
-- **DSi ntrboot** needs the GCD ROM in `default.nds`
-
-Since both use the same slot with different ROMs, **each requires its own firmware build**. The build system compiles them separately, producing `DSpico_ntrboot_3ds.uf2` and `DSpico_ntrboot_dsi.uf2`.
-
-Other flashcarts (like the R4i Gold 3DS) have dedicated hardware to switch between modes. DSpico doesn't — you simply re-flash a different `.uf2` file via BOOTSEL, which takes seconds.
-
-**Typical workflow:**
-
-```
-1. Build everything:  ENABLE_WRFUXXED=1 ENABLE_NTRBOOT=1 ./build_resources.sh
-
-2. Flash 3DS ntrboot firmware → install boot9strap on 3DS
-   └─ outputs/dspico/ntrboot/DSpico_ntrboot_3ds.uf2
-
-3. Flash DSi ntrboot firmware → install Unlaunch on DSi
-   └─ outputs/dspico/ntrboot/DSpico_ntrboot_dsi.uf2
-
-4. Flash normal firmware → use DSpico to play games
-   └─ outputs/dspico/firmware/DSpico.uf2
-```
+The LNH-team firmware has **2 ROM slots** (`default.nds` + `dsimode.nds`), so the build system produces **separate firmware files** for each ntrboot variant: `DSpico_ntrboot_3ds.uf2` and `DSpico_ntrboot_dsi.uf2`. Flash the one you need when using ntrboot, then flash the normal `DSpico.uf2` back for regular use.
 
 #### Required ntrboot files
 
 | File | Destination | Description |
 |------|-------------|-------------|
+<<<<<<< Updated upstream
 | 3DS ntrboot ROM | `inputs/ntrboot/default.nds` | **Required.** NDS ROM with header + NTR blowfish keys + boot9strap firm. |
 | DSi ntrboot ROM (GCD) | `inputs/ntrboot/dsimode.nds` | **Optional.** GCD-signed NDS ROM with GCD blowfish keys. Only needed for DSi ntrboot. |
 
@@ -160,31 +137,52 @@ This is a GCD (Game Card Developer) signed NDS ROM used for the DSi ntrboot expl
 3. The [DSi CFW Guide](https://dsi.cfw.guide/) has general information about DSi exploits
 
 > ⚠️ **DSi ntrboot requires USB power:** The DSpico must be powered via USB (e.g., connected to a PC or USB charger) so the firmware boots **before** the DSi starts its ntrboot sequence. Without external power, the firmware does not boot fast enough.
+=======
+| `boot9strap_ntr.firm` | `inputs/ntrboot/boot9strap_ntr.firm` | **3DS ntrboot.** Raw FIRM placed into the `default.nds` slot → separate `DSpico_ntrboot_3ds.uf2`. |
+| `default.gcd` | `inputs/ntrboot/default.gcd` | **DSi ntrboot.** GCD-signed ROM placed into the `default.nds` slot → separate `DSpico_ntrboot_dsi.uf2`. |
+
+> Each ntrboot variant is built as a **separate firmware** since only 2 ROM slots are available. The ntrboot file is copied directly into `roms/default.nds` — no encryption needed.
+
+#### How to obtain the files
+
+**3DS — `boot9strap_ntr.firm`:**
+1. Download `boot9strap_ntr.zip` from [boot9strap releases](https://github.com/SciresM/boot9strap/releases) (**v1.3** — not v1.4, as per [3ds.hacks.guide](https://3ds.hacks.guide/))
+2. Extract `boot9strap_ntr.firm` from the zip
+3. SHA1: `26bf0b603ec1c72fa648b27c5d547de05d447748`
+
+**DSi — `default.gcd`:**
+1. Check the [DSpico Discord](https://discord.gg/dspico) or the [DS(i) Mode Hacking](https://discord.gg/yD3spjv) Discord
+2. SHA1: `eca89918bbff86090a43e67f2805d9743e2ac343`
+
+> ⚠️ **DSi ntrboot requires USB power:** The DSpico must be powered via USB (e.g., connected to a PC or USB charger) so the firmware boots **before** the DSi starts its ntrboot sequence.
+>>>>>>> Stashed changes
 
 #### ntrboot setup and build
 
 ```bash
 mkdir -p inputs/ntrboot
+<<<<<<< Updated upstream
 cp /path/to/your/3ds_ntrboot.nds inputs/ntrboot/default.nds
 cp /path/to/your/dsi_gcd_rom.nds inputs/ntrboot/dsimode.nds  # optional, for DSi
+=======
+
+# 3DS ntrboot
+cp /path/to/boot9strap_ntr.firm inputs/ntrboot/
+
+# DSi ntrboot (optional)
+cp /path/to/default.gcd inputs/ntrboot/
+>>>>>>> Stashed changes
 ```
 
-**Build with ntrboot only:**
-```bash
-ENABLE_NTRBOOT=1 ./build_resources.sh
-```
-
-**Build with WRFUxxed + ntrboot (recommended — gives you both firmwares):**
+**Build with everything (recommended):**
 ```bash
 ENABLE_WRFUXXED=1 ENABLE_NTRBOOT=1 ./build_resources.sh
 ```
 
 This produces:
-- `outputs/dspico/firmware/DSpico.uf2` — normal firmware (with WRFUxxed if enabled) for playing games
-- `outputs/dspico/ntrboot/DSpico_ntrboot_3ds.uf2` — 3DS ntrboot firmware (always built)
-- `outputs/dspico/ntrboot/DSpico_ntrboot_dsi.uf2` — DSi ntrboot firmware (only if `dsimode.nds` provided)
-
-To switch between modes, hold BOOTSEL on DSpico and copy the desired `.uf2`.
+- `outputs/dspico/firmware/DSpico.uf2` — Normal firmware (bootloader + WRFUxxed)
+- `outputs/dspico/firmware/DSpico_ntrboot_3ds.uf2` — 3DS ntrboot firmware
+- `outputs/dspico/firmware/DSpico_ntrboot_dsi.uf2` — DSi ntrboot firmware
 
 ## Output Structure
 
@@ -199,7 +197,9 @@ outputs/dspico/
 ├── encryptor/
 │   └── default.nds             # Encrypted bootloader
 ├── firmware/
-│   └── DSpico.uf2              # Raspberry Pi Pico firmware
+│   ├── DSpico.uf2              # ⭐ Normal firmware (bootloader + WRFUxxed)
+│   ├── DSpico_ntrboot_3ds.uf2  # 3DS ntrboot (if ENABLE_NTRBOOT=1)
+│   └── DSpico_ntrboot_dsi.uf2  # DSi ntrboot (if ENABLE_NTRBOOT=1)
 ├── pico-loader/
 │   ├── picoLoader7.bin
 │   ├── picoLoader9_DSPICO.bin
@@ -221,15 +221,7 @@ outputs/dspico/
         └── savelist.bin
 ```
 
-With `ENABLE_NTRBOOT=1`, the ntrboot variants are also built:
-
-```
-outputs/dspico/
-└── ntrboot/
-    ├── DSpico_ntrboot_3ds.uf2  # 3DS ntrboot firmware
-    ├── DSpico_ntrboot_dsi.uf2  # DSi ntrboot firmware (if dsimode.nds provided)
-    └── BUILD_INFO.txt
-```
+> With `ENABLE_NTRBOOT=1`, separate ntrboot `.uf2` files are produced for 3DS and DSi. Flash the appropriate one when using ntrboot, then flash `DSpico.uf2` back for normal use.
 
 ## Usage
 
@@ -272,9 +264,9 @@ cp /path/to/your/games/*.nds /path/to/your/sdcard/roms/
 
 If you built with `ENABLE_NTRBOOT=1`:
 
-1. **For 3DS:** Flash `outputs/dspico/ntrboot/DSpico_ntrboot_3ds.uf2` to DSpico (BOOTSEL + copy), then follow the [ntrboot section of 3ds.hacks.guide](https://3ds.hacks.guide/ntrboot) using DSpico as your flashcart
-2. **For DSi:** Flash `outputs/dspico/ntrboot/DSpico_ntrboot_dsi.uf2` to DSpico — connect DSpico to USB power before powering on the DSi, then follow [dsi.cfw.guide](https://dsi.cfw.guide/)
-3. Once CFW is installed, re-flash `outputs/dspico/firmware/DSpico.uf2` to use DSpico normally for games
+1. **For 3DS:** Flash `DSpico_ntrboot_3ds.uf2` to DSpico, then follow the [ntrboot section of 3ds.hacks.guide](https://3ds.hacks.guide/ntrboot)
+2. **For DSi:** Flash `DSpico_ntrboot_dsi.uf2` to DSpico, connect to USB power before powering on the DSi, then follow [dsi.cfw.guide](https://dsi.cfw.guide/)
+3. Once CFW is installed, flash `DSpico.uf2` back to restore normal firmware for games
 
 ## All Input Files Summary
 
@@ -287,8 +279,13 @@ Complete reference of all files you may need to provide:
 | NTR Blowfish | `inputs/blowfish/ntrBlowfish.bin` | Alt. to BIOS | 4256 bytes, extracted blowfish table |
 | TWL Blowfish | `inputs/blowfish/twlBlowfish.bin` | Alt. to BIOS | 4096 bytes, extracted blowfish table |
 | WRFU Tester v0.60 | `inputs/wrfuxxed/dsimode.nds` | If `ENABLE_WRFUXXED=1` | WRFUxxed exploit ROM |
+<<<<<<< Updated upstream
 | 3DS ntrboot ROM | `inputs/ntrboot/default.nds` | If `ENABLE_NTRBOOT=1` | boot9strap payload in NDS format |
 | DSi ntrboot ROM | `inputs/ntrboot/dsimode.nds` | Optional | GCD-signed ROM for DSi ntrboot |
+=======
+| boot9strap NTR FIRM | `inputs/ntrboot/boot9strap_ntr.firm` | If `ENABLE_NTRBOOT=1` (3DS) | Raw FIRM, copied as-is into firmware |
+| DSi ntrboot GCD ROM | `inputs/ntrboot/default.gcd` | If `ENABLE_NTRBOOT=1` (DSi) | GCD-signed ROM, copied as-is into firmware |
+>>>>>>> Stashed changes
 
 ## Troubleshooting
 
@@ -311,12 +308,19 @@ Complete reference of all files you may need to provide:
 
 ### ❌ ntrboot not working on DSi
 - DSpico **must be powered via USB** — the firmware needs to boot before the DSi starts its ntrboot sequence
-- Verify `inputs/ntrboot/dsimode.nds` is a properly signed GCD ROM
-- Ensure GCD blowfish keys are embedded in the ROM
+- Verify `inputs/ntrboot/default.gcd` is a properly signed GCD ROM
+- Verify SHA1: `eca89918bbff86090a43e67f2805d9743e2ac343`
 
 ### ❌ ntrboot not working on 3DS
+<<<<<<< Updated upstream
 - Verify `inputs/ntrboot/default.nds` contains the correct ntrboot payload (header + blowfish keys + firm)
 - Try re-downloading the boot9strap ntr release
+=======
+- Make sure you have `boot9strap_ntr.firm` (the **NTR** variant, not regular `boot9strap.firm`)
+- Use **v1.3** from [boot9strap releases](https://github.com/SciresM/boot9strap/releases) (not v1.4)
+- Verify SHA1: `26bf0b603ec1c72fa648b27c5d547de05d447748`
+- The file must be at `inputs/ntrboot/boot9strap_ntr.firm`
+>>>>>>> Stashed changes
 
 ### ❌ "Failed to mount SD card" (blue screen)
 - SD card may be corrupted or incompatible
