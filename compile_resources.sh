@@ -402,10 +402,10 @@ step_firmware_ntrboot() {
   if [ -f /inputs/ntrboot/boot9strap_ntr.firm ]; then
     info "Building 3DS ntrboot firmware..."
 
-    # Convert .firm to .nds using firm-to-nds-dspico
-    local firm_tool=/tmp/firm-to-nds-dspico
+    # Convert .firm to .nds using firm-to-nds
+    local firm_tool=/tmp/firm-to-nds
     if [ ! -d "$firm_tool" ]; then
-      git clone https://github.com/amt911/firm-to-nds-dspico.git "$firm_tool"
+      git clone https://github.com/amt911/firm-to-nds.git "$firm_tool"
     fi
     local ntrboot_nds="/tmp/ntrboot_default.nds"
     python3 "$firm_tool/firm_to_nds.py" /inputs/ntrboot/boot9strap_ntr.firm "$ntrboot_nds" \
@@ -416,7 +416,6 @@ step_firmware_ntrboot() {
     rm -f roms/*.nds
     rm -rf build
     cp -v "$ntrboot_nds" roms/default.nds
-    cp -v "$ntrboot_nds" "$OUT_BASE/firmware/default_ntrboot_3ds.nds"  # also save the .nds for reference
     chmod +x compile.sh
     ./compile.sh || error_exit "3DS ntrboot firmware compilation failed"
     local uf2_3ds

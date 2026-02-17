@@ -123,7 +123,7 @@ The LNH-team firmware has **2 ROM slots** (`default.nds` + `dsimode.nds`), so th
 3. Place the **unmodified** `.firm` file in `inputs/ntrboot/` — do **not** modify it or convert it manually
 4. SHA1: `26bf0b603ec1c72fa648b27c5d547de05d447748`
 
-> The build system automatically converts `boot9strap_ntr.firm` to NDS format using [firm-to-nds-dspico](https://github.com/amt911/firm-to-nds-dspico) (prepends the required NDS header).
+> The build system automatically converts `boot9strap_ntr.firm` to NDS format using [firm-to-nds](https://github.com/amt911/firm-to-nds) (prepends the required NDS header).
 
 **DSi — `default.gcd`:**
 1. Check the [DSpico Discord](https://discord.gg/dspico) or the [DS(i) Mode Hacking](https://discord.gg/yD3spjv) Discord
@@ -329,7 +329,7 @@ This script automatically clones and builds:
 5. [dspico-firmware](https://github.com/LNH-team/dspico-firmware) - Raspberry Pi Pico firmware
 6. [pico-loader](https://github.com/LNH-team/pico-loader) - Game loader
 7. [pico-launcher](https://github.com/LNH-team/pico-launcher) - UI launcher
-8. [firm-to-nds-dspico](https://github.com/amt911/firm-to-nds-dspico) - FIRM to NDS converter (for ntrboot)
+8. [firm-to-nds](https://github.com/amt911/firm-to-nds) - FIRM to NDS converter (for ntrboot)
 
 ## License
 

@@ -1,4 +1,7 @@
+# Ignore all files in inputs and subdirectories
+inputs/**
+# But keep the directory structure (allow directories and .gitkeep files)
+!inputs/**/
+!inputs/**/.gitkeep
+
 outputs/
-# Ignore all the contents from inputs, but keep the directory itself and the gitkeep file
-inputs/*
-!inputs/.gitkeep
