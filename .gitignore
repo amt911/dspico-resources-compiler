@@ -1,2 +1,4 @@
 outputs/
-inputs/
+# Ignore all the contents from inputs, but keep the directory itself and the gitkeep file
+inputs/*
+!inputs/.gitkeep
