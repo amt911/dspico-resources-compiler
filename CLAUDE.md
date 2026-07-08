@@ -111,6 +111,28 @@ This project has **no unit/integration test suite** — it is a shell + Docker b
 
 **Process rule (worth more than any tool): you cannot run the copyrighted-input build yourself, so don't claim the pipeline "works" — claim exactly what you verified** (ShellCheck clean, `docker build` succeeds, syntax parses) and hand the user a precise manual test plan for the full run. Evidence before assertions.
 
+## Agentic PR verification (MANDATORY on every PR)
+
+**Every PR MUST be verified end-to-end before merge, and the verdict MUST be posted as a PR
+comment** via `gh pr comment`. A headless agent (`claude -p`, local) drives the change and posts
+the result; it **never merges** — it waits for you. Running the pass and posting the verdict
+comment is **not optional**. It catches what ShellCheck and a diff miss: a step that silently
+skips, a stale artifact being copied forward, or an SD-card layout that's subtly wrong.
+
+- **Engine.** No browser, no API to smoke-test — this is a build orchestrator. The agentic pass
+  means: `docker build -t dspico-compiler:latest .` to confirm the image still builds, then run
+  `compile_resources.sh` inside the container against **non-copyrighted stub inputs** (dummy
+  same-size byte blobs in place of the real Blowfish tables / BIOS dumps) far enough to exercise
+  the changed `step_*` function(s) and confirm the loud-failure guards (`error_exit`,
+  `find_artifact`) still fire on missing/invalid input. **Never** require or use the user's real,
+  copyrighted Blowfish tables/BIOS dumps to verify — those are user-supplied and out of scope for
+  an agent; a full real run with the genuine inputs stays the user's own manual verification step
+  (see "Tests and quality" above).
+- **Two layers.** Deterministic checks (ShellCheck, `bash -n`, `docker build`) stay the hard merge
+  gate; the agentic pass is advisory and never vetoes a merge on its own — but running it and
+  posting the verdict comment is mandatory.
+- **Hard limits.** The verdict awaits your close; the agent never merges.
+
 ## Working rules
 
 - **Use superpowers skills whenever they apply** — invoke via `Skill` before acting; process skills before implementation skills.
