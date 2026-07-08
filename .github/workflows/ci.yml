@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # --severity=warning: verified 0 findings locally at that level (the only default-level
+      # finding is an info-level SC1091 for a script sourced only inside the container). Blocking.
+      - run: shellcheck --severity=warning build_resources.sh compile_resources.sh
+
+  hadolint:
+    name: hadolint (Dockerfile)
+    runs-on: ubuntu-latest
+    # Advisory: verified locally with `docker run hadolint/hadolint < Dockerfile` — it reports
+    # pre-existing style findings (unpinned apt versions, USER ending as root, consecutive RUN).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    # Advisory: not currently blocking, to avoid turning main red on a still-evolving ruleset.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install semgrep
+      # NOTE: the "p/bash" registry shorthand 404s as of writing; "r/bash" is the ruleset that
+      # actually resolves and covers the same bash-specific checks. Verified 0 findings locally.
+      - run: >-
+          semgrep scan --disable-version-check --metrics=off
+          --config r/bash
