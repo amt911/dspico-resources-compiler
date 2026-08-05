@@ -149,6 +149,26 @@ setup_dirs() {
   done
 }
 
+# Hand /outputs back to whoever owns the mount point on the host.
+#
+# The container runs as root (the Dockerfile's final USER is root), so under
+# rootful Docker every artifact would land root-owned and the user could not
+# even delete their own outputs/.
+#
+# The right target is NOT the host's UID. Under rootless podman the host user
+# maps to container root, so chowning to the literal host UID would hand every
+# artifact to an unrelated subuid. The mount point was created on the host by
+# the invoking user, so whatever UID the container sees on it is the correct
+# target under rootful Docker, rootless podman and Docker Desktop alike.
+fix_ownership() {
+  local uid gid
+  uid=$(stat -c %u /outputs 2>/dev/null) || return 0
+  gid=$(stat -c %g /outputs 2>/dev/null) || return 0
+  if ! chown -R "$uid:$gid" "$OUT_BASE" 2>/dev/null; then
+    warn "⚠ Could not set ownership of $OUT_BASE to $uid:$gid; artifacts may be root-owned"
+  fi
+}
+
 # =============================================================================
 #  Build steps
 # =============================================================================
@@ -526,6 +546,7 @@ main() {
   step_pico_launcher
   step_assemble_sd
   step_firmware_ntrboot
+  fix_ownership
 
   echo ""
   info "════════════════════════════════════════"
