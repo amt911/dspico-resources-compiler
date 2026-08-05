@@ -115,3 +115,58 @@ def test_flags_become_the_env_vars_the_shell_pipeline_reads(
 def test_engine_is_overridable(config: BuildConfig, tmp_path: Path) -> None:
     argv = run_container_argv(config, X86_LINUX, script_path=tmp_path / "s.sh", engine="podman")
     assert argv[0] == "podman"
+
+
+def test_python_engine_runs_the_package_through_a_login_shell(
+    config: BuildConfig, tmp_path: Path
+) -> None:
+    # Still bash -lc: /etc/profile.d/wonderful.sh sources wf-env, which is what
+    # puts the BlocksDS toolchain on PATH. Only the payload changes.
+    argv = run_container_argv(
+        config, X86_LINUX, script_path=tmp_path / "s.sh", engine_kind="python"
+    )
+    assert argv[argv.index("--entrypoint") + 1] == "bash"
+    assert argv[-2] == "-lc"
+    payload = argv[-1]
+    assert "python3 -m dspico.pipeline.run" in payload
+    assert "PYTHONPATH=/dspico" in payload
+
+
+def test_python_engine_mounts_the_repository_read_only(config: BuildConfig, tmp_path: Path) -> None:
+    argv = run_container_argv(
+        config, X86_LINUX, script_path=tmp_path / "s.sh", engine_kind="python"
+    )
+    assert any(a.endswith(":/dspico:ro") for a in argv)
+
+
+def test_python_engine_passes_flags_not_env_vars(tmp_path: Path) -> None:
+    config = BuildConfig(
+        inputs_dir=tmp_path / "inputs",
+        outputs_dir=tmp_path / "outputs",
+        wrfuxxed=True,
+        ntrboot=True,
+    )
+    argv = run_container_argv(
+        config, X86_LINUX, script_path=tmp_path / "s.sh", engine_kind="python"
+    )
+    payload = argv[-1]
+    assert "--wrfuxxed" in payload
+    assert "--ntrboot" in payload
+    assert "--edo-firmware" not in payload
+
+
+def test_bash_engine_is_unchanged(config: BuildConfig, tmp_path: Path) -> None:
+    # The default path must stay byte-identical while both engines exist.
+    default = run_container_argv(config, X86_LINUX, script_path=tmp_path / "s.sh")
+    explicit = run_container_argv(
+        config, X86_LINUX, script_path=tmp_path / "s.sh", engine_kind="bash"
+    )
+    assert default == explicit
+    assert default[-1] == "/dspico/compile_resources.sh"
+
+
+def test_unknown_engine_kind_is_rejected(config: BuildConfig, tmp_path: Path) -> None:
+    from dspico.errors import BuildError
+
+    with pytest.raises(BuildError, match="engine"):
+        run_container_argv(config, X86_LINUX, script_path=tmp_path / "s.sh", engine_kind="perl")

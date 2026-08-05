@@ -35,6 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--wrfuxxed", action="store_true", help="build the WRFUxxed exploit ROM")
     build.add_argument("--ntrboot", action="store_true", help="build the ntrboot variants")
     build.add_argument("--edo-firmware", action="store_true", help="use the edo9300 firmware fork")
+    build.add_argument(
+        "--engine-kind",
+        choices=("bash", "python"),
+        default="bash",
+        help="which pipeline implementation runs inside the container",
+    )
     build.add_argument("--skip-image-build", action="store_true", help="reuse the existing image")
     build.add_argument(
         "--dry-run", action="store_true", help="print the commands without running them"
@@ -85,7 +91,14 @@ def _run_build(args: argparse.Namespace, *, cwd: Path) -> None:
     if not args.dry_run:
         config.outputs_dir.mkdir(parents=True, exist_ok=True)
     runner.run(
-        run_container_argv(config, env, script_path=script_path, engine=args.engine),
+        run_container_argv(
+            config,
+            env,
+            script_path=script_path,
+            engine=args.engine,
+            engine_kind=args.engine_kind,
+            repo_dir=context_dir,
+        ),
         step="pipeline",
     )
 
