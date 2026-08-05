@@ -131,7 +131,8 @@ encrypt_rom() {
 compute_steps() {
   TOTAL_STEPS=9
   [ "${ENABLE_WRFUXXED:-0}" != "1" ] || true  # wrfuxxed is already step 4
-  if [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
+  # With edo9300 firmware, ntrboot is embedded in the main firmware build (step 5)
+  if [ "${ENABLE_NTRBOOT:-0}" = "1" ] && [ "${USE_EDO_FIRMWARE:-0}" != "1" ]; then
     TOTAL_STEPS=$((TOTAL_STEPS + 1))
   fi
 }
@@ -270,7 +271,16 @@ step_firmware() {
   local repo=/tmp/dspico-firmware
   step "5/$TOTAL_STEPS" "Build DSpico Firmware"
 
-  clone_repo https://github.com/LNH-team/dspico-firmware "$repo"
+  # Choose firmware repository
+  local firmware_url="https://github.com/LNH-team/dspico-firmware"
+  local firmware_name="dspico-firmware"
+  if [ "${USE_EDO_FIRMWARE:-0}" = "1" ]; then
+    firmware_url="https://github.com/edo9300/dspico-firmware"
+    firmware_name="dspico-firmware (edo9300)"
+    info "Using edo9300 firmware fork"
+  fi
+
+  clone_repo "$firmware_url" "$repo"
   git submodule update --init
   (cd pico-sdk && git submodule update --init)
 
@@ -290,13 +300,54 @@ step_firmware() {
     sed -i 's/^\(\s*\)#\s*\(DSPICO_ENABLE_WRFUXXED\)/\1\2/' CMakeLists.txt || true
   fi
 
+  # ntrboot integration for edo9300 firmware (dedicated ROM slots: ntrboot.nds + ntrbootdsi.nds)
+  if [ "${USE_EDO_FIRMWARE:-0}" = "1" ] && [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
+    local has_3ds=0 has_dsi=0
+
+    # Convert 3DS ntrboot FIRM → NDS
+    if [ -f /inputs/ntrboot/boot9strap_ntr.firm ]; then
+      local firm_tool=/tmp/firm-to-nds
+      if [ ! -d "$firm_tool" ]; then
+        git clone https://github.com/amt911/firm-to-nds.git "$firm_tool"
+      fi
+      local ntrboot_nds="/tmp/ntrboot_3ds.nds"
+      python3 "$firm_tool/firm_to_nds.py" /inputs/ntrboot/boot9strap_ntr.firm "$ntrboot_nds" \
+        || error_exit "firm-to-nds conversion failed for boot9strap_ntr.firm"
+      [ -f "$ntrboot_nds" ] || error_exit "firm-to-nds did not produce output file"
+      has_3ds=1
+      info "  ✓ Converted boot9strap_ntr.firm → ntrboot NDS"
+    fi
+
+    # DSi ntrboot GCD ROM
+    if [ -f /inputs/ntrboot/default.gcd ]; then
+      has_dsi=1
+    fi
+
+    # Place ROMs in the appropriate slots:
+    #   ntrboot.nds     = 3DS ntrboot (or DSi if it's the only one)
+    #   ntrbootdsi.nds  = DSi ntrboot (when 3DS is also present)
+    if [ "$has_3ds" = "1" ] && [ "$has_dsi" = "1" ]; then
+      cp -v "$ntrboot_nds" "$repo/roms/ntrboot.nds"
+      cp -v /inputs/ntrboot/default.gcd "$repo/roms/ntrbootdsi.nds"
+      info "  ✓ ntrboot: 3DS → ntrboot.nds, DSi → ntrbootdsi.nds"
+    elif [ "$has_3ds" = "1" ]; then
+      cp -v "$ntrboot_nds" "$repo/roms/ntrboot.nds"
+      info "  ✓ ntrboot: 3DS → ntrboot.nds"
+    elif [ "$has_dsi" = "1" ]; then
+      cp -v /inputs/ntrboot/default.gcd "$repo/roms/ntrboot.nds"
+      info "  ✓ ntrboot: DSi → ntrboot.nds"
+    else
+      warn "⚠ ENABLE_NTRBOOT=1 but no ntrboot files found in inputs/ntrboot/"
+    fi
+  fi
+
   chmod +x compile.sh
   ./compile.sh || error_exit "Firmware compilation failed"
 
   find_artifact "$repo/build" "*.uf2" >/dev/null
   copy_glob "$repo/build/*.uf2" "$OUT_BASE/firmware/"
 
-  write_build_info "$repo" "$OUT_BASE/firmware" "dspico-firmware"
+  write_build_info "$repo" "$OUT_BASE/firmware" "$firmware_name"
   info "✓ Firmware built"
 }
 
@@ -389,6 +440,12 @@ step_firmware_ntrboot() {
     return
   fi
 
+  # With edo9300 firmware, ntrboot ROMs are included in the main firmware build (step 5)
+  if [ "${USE_EDO_FIRMWARE:-0}" = "1" ]; then
+    info "⊗ Skipped (ntrboot already included in edo9300 firmware build)"
+    return
+  fi
+
   # LNH-team firmware has 2 ROM slots (default.nds + dsimode.nds), so each
   # ntrboot variant needs its own separate firmware build.
   local repo=/tmp/dspico-firmware-ntrboot
@@ -473,7 +530,12 @@ main() {
   echo ""
   info "════════════════════════════════════════"
   info "  All components built successfully!"
-  if [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
+  if [ "${USE_EDO_FIRMWARE:-0}" = "1" ]; then
+    info "  Firmware: edo9300 fork"
+    if [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
+      info "  ntrboot: embedded in DSpico.uf2 (auto-detect)"
+    fi
+  elif [ "${ENABLE_NTRBOOT:-0}" = "1" ]; then
     [ -f "$OUT_BASE/firmware/DSpico_ntrboot_3ds.uf2" ] && info "  ntrboot 3DS: outputs/dspico/firmware/DSpico_ntrboot_3ds.uf2"
     [ -f "$OUT_BASE/firmware/DSpico_ntrboot_dsi.uf2" ] && info "  ntrboot DSi: outputs/dspico/firmware/DSpico_ntrboot_dsi.uf2"
   fi
