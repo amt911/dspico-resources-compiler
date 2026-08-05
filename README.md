@@ -18,16 +18,13 @@ The bootloader must be encrypted with Nintendo DS Blowfish keys. These can be **
 
 #### Quick Verification
 
+Check your files against the SHA-1s listed in **All Input Files Summary** below:
+
 ```bash
-# Check if your files are valid
-./verify_blowfish.sh
-
-# Try to extract Blowfish from BIOS dumps (if they don't match expected SHA1)
-./extract_blowfish.sh inputs/blowfish/biosnds7.rom
-
-# Search for valid Blowfish patterns in large dumps
-./find_blowfish.sh inputs/blowfish/biosnds7.rom
+sha1sum inputs/blowfish/*
 ```
+
+If a hash does not match, use one of the options below to obtain a good dump.
 
 #### Option A: Use GodMode9 on 3DS (MOST RELIABLE)
 
@@ -153,6 +150,33 @@ This produces:
 - `outputs/dspico/firmware/DSpico_ntrboot_3ds.uf2` — 3DS ntrboot firmware
 - `outputs/dspico/firmware/DSpico_ntrboot_dsi.uf2` — DSi ntrboot firmware
 
+### 5. Optional: Use edo9300 Firmware Fork
+
+The [edo9300 firmware fork](https://github.com/edo9300/dspico-firmware) adds **dedicated ntrboot ROM slots** (`ntrboot.nds` + `ntrbootdsi.nds`) alongside the regular `default.nds` and `dsimode.nds`. This means ntrboot support can be **embedded in a single firmware build** — no need for separate `.uf2` files.
+
+**Advantages over the official firmware:**
+- ntrboot is included in the main `DSpico.uf2` (no need to reflash between normal use and ntrboot)
+- The firmware auto-detects ntrboot and serves the correct ROM automatically
+- Both 3DS and DSi ntrboot can coexist in a single build
+
+**Build with edo9300 firmware:**
+```bash
+USE_EDO_FIRMWARE=1 ./build_resources.sh
+```
+
+**Build with everything (recommended):**
+```bash
+USE_EDO_FIRMWARE=1 ENABLE_WRFUXXED=1 ENABLE_NTRBOOT=1 ./build_resources.sh
+```
+
+This produces a single `outputs/dspico/firmware/DSpico.uf2` containing:
+- Encrypted bootloader (`default.nds`)
+- WRFUxxed exploit ROM (`dsimode.nds`, if `ENABLE_WRFUXXED=1`)
+- 3DS ntrboot ROM (`ntrboot.nds`, if `boot9strap_ntr.firm` provided)
+- DSi ntrboot ROM (`ntrbootdsi.nds`, if `default.gcd` provided)
+
+> ⚠️ With `USE_EDO_FIRMWARE=1`, the separate ntrboot `.uf2` files are **not** produced. Instead, the main `DSpico.uf2` handles everything.
+
 ## Output Structure
 
 After building, you'll find:
@@ -190,7 +214,9 @@ outputs/dspico/
         └── savelist.bin
 ```
 
-> With `ENABLE_NTRBOOT=1`, separate ntrboot `.uf2` files are produced for 3DS and DSi. Flash the appropriate one when using ntrboot, then flash `DSpico.uf2` back for normal use.
+> With `ENABLE_NTRBOOT=1` (official firmware), separate ntrboot `.uf2` files are produced for 3DS and DSi. Flash the appropriate one when using ntrboot, then flash `DSpico.uf2` back for normal use.
+>
+> With `USE_EDO_FIRMWARE=1`, ntrboot is embedded in the main `DSpico.uf2` and auto-detected — no reflashing needed.
 
 ## Usage
 
@@ -233,9 +259,17 @@ cp /path/to/your/games/*.nds /path/to/your/sdcard/roms/
 
 If you built with `ENABLE_NTRBOOT=1`:
 
+**With official firmware (separate `.uf2` files):**
 1. **For 3DS:** Flash `DSpico_ntrboot_3ds.uf2` to DSpico, then follow the [ntrboot section of 3ds.hacks.guide](https://3ds.hacks.guide/ntrboot)
 2. **For DSi:** Flash `DSpico_ntrboot_dsi.uf2` to DSpico, connect to USB power before powering on the DSi, then follow [dsi.cfw.guide](https://dsi.cfw.guide/)
 3. Once CFW is installed, flash `DSpico.uf2` back to restore normal firmware for games
+
+**With edo9300 firmware (`USE_EDO_FIRMWARE=1`):**
+1. Flash `DSpico.uf2` to DSpico — ntrboot is already embedded
+2. The firmware auto-detects ntrboot and serves the correct ROM
+3. **For 3DS:** Follow the [ntrboot section of 3ds.hacks.guide](https://3ds.hacks.guide/ntrboot)
+4. **For DSi:** Connect to USB power before powering on the DSi, then follow [dsi.cfw.guide](https://dsi.cfw.guide/)
+5. No reflashing needed — the same firmware works for both normal use and ntrboot
 
 ## All Input Files Summary
 
@@ -312,11 +346,12 @@ IMAGE_NAME=my-dspico-compiler:v1 ./build_resources.sh
 DLDITOOL=/custom/path/to/dlditool \
 ENABLE_WRFUXXED=1 \
 ENABLE_NTRBOOT=1 \
+USE_EDO_FIRMWARE=1 \
 IMAGE_NAME=custom:latest \
 ./build_resources.sh
 ```
 
-> `ENABLE_WRFUXXED` and `ENABLE_NTRBOOT` can be combined. Both flags are additive.
+> `ENABLE_WRFUXXED`, `ENABLE_NTRBOOT`, and `USE_EDO_FIRMWARE` can be combined. All flags are additive.
 
 ## Components Built
 
@@ -326,10 +361,11 @@ This script automatically clones and builds:
 2. [dspico-bootloader](https://github.com/LNH-team/dspico-bootloader) - Cartridge bootloader
 3. [DSRomEncryptor](https://github.com/Gericom/DSRomEncryptor) - ROM encryption tool
 4. [dspico-wrfuxxed](https://github.com/LNH-team/dspico-wrfuxxed) - DSi/3DS exploit (optional)
-5. [dspico-firmware](https://github.com/LNH-team/dspico-firmware) - Raspberry Pi Pico firmware
-6. [pico-loader](https://github.com/LNH-team/pico-loader) - Game loader
-7. [pico-launcher](https://github.com/LNH-team/pico-launcher) - UI launcher
-8. [firm-to-nds](https://github.com/amt911/firm-to-nds) - FIRM to NDS converter (for ntrboot)
+5. [dspico-firmware](https://github.com/LNH-team/dspico-firmware) - Raspberry Pi Pico firmware (official)
+6. [dspico-firmware (edo9300)](https://github.com/edo9300/dspico-firmware) - Firmware fork with ntrboot ROM slots (if `USE_EDO_FIRMWARE=1`)
+7. [pico-loader](https://github.com/LNH-team/pico-loader) - Game loader
+8. [pico-launcher](https://github.com/LNH-team/pico-launcher) - UI launcher
+9. [firm-to-nds](https://github.com/amt911/firm-to-nds) - FIRM to NDS converter (for ntrboot)
 
 ## License
 
