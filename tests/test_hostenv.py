@@ -4,6 +4,8 @@ These are the two things that make the build work off Linux/x86_64, so every
 branch is pinned here rather than discovered on a user's machine.
 """
 
+from pathlib import PurePosixPath, PureWindowsPath
+
 import pytest
 
 from dspico.hostenv import (
@@ -13,6 +15,7 @@ from dspico.hostenv import (
     X86_64,
     HostEnv,
     build_user,
+    docker_mount_path,
     docker_platform,
     needs_emulation,
     normalize_arch,
@@ -91,6 +94,27 @@ def test_arch_property_normalizes() -> None:
 def test_is_linux_property() -> None:
     assert HostEnv(system="Linux", machine="x86_64", uid=1, gid=1).is_linux is True
     assert HostEnv(system="Darwin", machine="arm64", uid=1, gid=1).is_linux is False
+
+
+def test_windows_paths_render_with_forward_slashes() -> None:
+    # Asserted with PureWindowsPath so the case is covered on every CI platform,
+    # not only on the Windows leg.
+    rendered = docker_mount_path(PureWindowsPath(r"C:\Users\a\inputs"))
+    assert rendered == "C:/Users/a/inputs"
+
+
+def test_windows_drive_letter_is_preserved() -> None:
+    # Docker needs the drive letter; stripping it would mount the wrong thing.
+    assert docker_mount_path(PureWindowsPath(r"D:\build\outputs")).startswith("D:/")
+
+
+def test_posix_paths_are_unchanged() -> None:
+    assert docker_mount_path(PurePosixPath("/home/a/inputs")) == "/home/a/inputs"
+
+
+def test_spaces_are_preserved_verbatim() -> None:
+    # The argv is passed as a list, never through a shell, so no quoting here.
+    assert docker_mount_path(PureWindowsPath(r"C:\My Files\in")) == "C:/My Files/in"
 
 
 def test_detect_returns_a_usable_env_on_this_host() -> None:

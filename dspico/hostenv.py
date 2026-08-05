@@ -3,6 +3,7 @@
 import os
 import platform
 from dataclasses import dataclass
+from pathlib import PurePath
 
 X86_64 = "x86_64"
 AARCH64 = "aarch64"
@@ -83,3 +84,14 @@ def build_user(env: HostEnv) -> tuple[int, int]:
     if env.is_linux:
         return env.uid, env.gid
     return DEFAULT_CONTAINER_UID, DEFAULT_CONTAINER_GID
+
+
+def docker_mount_path(path: PurePath) -> str:
+    r"""Render a host path for a ``-v`` argument.
+
+    Docker accepts forward slashes on every platform, and
+    ``PureWindowsPath.as_posix()`` keeps the drive letter intact (``C:\Users\a``
+    becomes ``C:/Users/a``). Backslashes would also be accepted but make the
+    colon-separated ``-v`` argument needlessly ambiguous to read.
+    """
+    return path.as_posix()
