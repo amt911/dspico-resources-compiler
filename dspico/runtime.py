@@ -23,6 +23,19 @@ class CommandError(BuildError):
         self.returncode = returncode
 
 
+def capture(argv: Sequence[str]) -> str:
+    """Run a command and return its stdout, stripped.
+
+    Deliberately not part of :class:`Runner`: it is only used to read provenance
+    metadata, never to drive the build, and its output is the point rather than
+    a side effect.
+    """
+    completed = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    if completed.returncode != 0:
+        raise CommandError(argv, completed.returncode)
+    return completed.stdout.strip()
+
+
 class Runner(Protocol):
     """Runs a command, raising :class:`CommandError` if it fails."""
 
