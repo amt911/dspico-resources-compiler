@@ -150,6 +150,11 @@ dspico-firmware,pico-loader,pico-launcher}`, `Gericom/DSRomEncryptor`, `edo9300/
 ## Commands
 
 ```bash
+# Portable launcher (Linux/macOS/Windows). Runs the same compile_resources.sh.
+# Needs Python 3.11+ on the host; flags instead of env vars so PowerShell works.
+python -m dspico build --wrfuxxed --ntrboot --edo-firmware
+python -m dspico build --dry-run     # print the docker commands, run nothing
+
 # Full build: builds the Docker image, then runs the in-container pipeline.
 # Requires Blowfish tables in inputs/blowfish/ (see README).
 ./build_resources.sh

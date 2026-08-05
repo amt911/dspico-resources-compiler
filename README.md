@@ -4,9 +4,11 @@ Automated Docker-based build system for compiling all DSpico components and asse
 
 ## Prerequisites
 
-1. **Linux or WSL** environment
-2. **Docker** installed and running
+1. **Docker** (or Podman) installed and running
+2. **Python 3.11+** on the host
 3. **Blowfish encryption tables** (see below)
+
+Runs on Linux, macOS (Intel and Apple Silicon) and Windows. On a non-x86_64 host the toolchain image runs emulated, so expect a considerably slower build.
 
 ## Quick Start
 
@@ -59,6 +61,22 @@ cp /path/to/biosdsi7.rom inputs/blowfish/  # 64 KB (optional, for DSi)
 ```
 
 ### 2. Build All Components
+
+```bash
+# Portable launcher — identical on Linux, macOS and Windows
+python -m dspico build
+
+# Feature flags are CLI flags, so they work the same in PowerShell
+python -m dspico build --wrfuxxed --ntrboot --edo-firmware
+
+# Print the exact docker commands without running a build
+python -m dspico build --dry-run
+
+# Custom directories and image name
+python -m dspico build --inputs /path/to/inputs --outputs /path/to/outputs --image mine:dev
+```
+
+`./build_resources.sh` still works and produces the same result, but it needs a POSIX shell. It will be removed once the Python pipeline is validated.
 
 ```bash
 ./build_resources.sh
