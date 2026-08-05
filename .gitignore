@@ -5,3 +5,15 @@ inputs/**
 !inputs/**/.gitkeep
 
 outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.mutmut-cache
+mutants/

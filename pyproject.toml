@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dspico-resources-compiler"
+version = "0.1.0"
+description = "Cross-platform build orchestrator for the DSpico flashcart"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "mutmut>=3,<4",
+]
+
+[tool.setuptools.packages.find]
+include = ["dspico*"]
+
+[tool.setuptools.package-data]
+dspico = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# ruff formats Python code blocks inside markdown, which would rewrite the
+# illustrative snippets in the specs and plans under docs/.
+exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["dspico", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
