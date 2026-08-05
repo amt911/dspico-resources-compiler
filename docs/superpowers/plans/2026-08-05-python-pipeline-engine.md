@@ -1512,6 +1512,25 @@ git commit -m "docs: document the python pipeline engine"
 
 ---
 
+## Deviations, as executed
+
+1. **Three steps are not ported.** `encryptor`, `firmware` and `ntrboot_variants` need drivers that
+   orchestrate .NET, ROM injection and repeated firmware builds. They are listed in
+   `PENDING_STEPS` and **raise** `BuildError` when dispatched, so a partial engine aborts rather
+   than producing a build that looks successful. A test asserts that behaviour for each of them,
+   and another asserts every planned step has a dispatch route — so adding a step without wiring it
+   up fails the suite instead of being silently skipped.
+2. **`--plan-only` was added to the in-container entry point.** It prints the steps a configuration
+   would run and exits. It is what made verification inside the real image possible without any
+   copyrighted input, and it is how the honest step numbering was confirmed.
+3. **`components.py` was written before its test.** A TDD slip on my part; corrected by moving the
+   module aside and confirming the tests went red before restoring it.
+4. **ruff caught two regex-in-`match=` defects in the plan's own test code.** `match="LAUNCHER.nds"`
+   treats `.` as a metacharacter; escaped to `r"LAUNCHER\.nds"`.
+5. **One test assertion in this plan was wrong.** `argv[-3:-1] == ["bash", "-lc"]` does not hold —
+   `bash` appears as the `--entrypoint` value, not immediately before `-lc`. Rewritten to assert
+   the actual intent.
+
 ## Definition of done
 
 - [ ] `.venv/bin/python -m pytest` passes; the suite grew by roughly 50 tests.

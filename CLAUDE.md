@@ -155,6 +155,9 @@ dspico-firmware,pico-loader,pico-launcher}`, `Gericom/DSRomEncryptor`, `edo9300/
 python -m dspico build --wrfuxxed --ntrboot --edo-firmware
 python -m dspico build --dry-run     # print the docker commands, run nothing
 
+# Second engine, INCOMPLETE and unvalidated — see "Two engines" below.
+python -m dspico build --engine-kind=python
+
 # Full build: builds the Docker image, then runs the in-container pipeline.
 # Requires Blowfish tables in inputs/blowfish/ (see README).
 ./build_resources.sh
@@ -182,6 +185,23 @@ docker run --rm -i hadolint/hadolint < Dockerfile
 **Fast iteration:** `compile_resources.sh` is **bind-mounted** into the container, so editing it and
 re-running `./build_resources.sh` picks the change up without rebuilding the image (the `docker build`
 is a cache hit). Only `Dockerfile` changes cost a real rebuild.
+
+## Two engines
+
+The pipeline is mid-migration from shell to Python. `--engine-kind` picks which one runs **inside**
+the container; the host launcher is the same either way.
+
+- **`bash` (default)** — `compile_resources.sh`, unchanged and complete. This is the engine to use.
+- **`python`** — `dspico.pipeline.run`, imported over `PYTHONPATH` (never installed; the container
+  ships Python 3.11.2). **Six of nine steps are ported**: dldi, bootloader, wrfuxxed, pico_loader,
+  pico_launcher, sd_card. `encryptor`, `firmware` and `ntrboot_variants` **raise** rather than
+  no-op, so a partial run aborts instead of producing a plausible-looking wrong build.
+
+**The Python engine has never completed a real build.** Do not describe it as working. When it is
+finished, the two engines are compared on: identical relative file tree under `outputs/dspico/`,
+identical file sizes, and identical upstream commit in every `BUILD_INFO.txt` — the artifacts
+themselves are not bit-reproducible, because upstream clones float to their default branch and
+builds carry timestamps.
 
 ## Tests and quality
 

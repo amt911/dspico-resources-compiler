@@ -78,6 +78,11 @@ python -m dspico build --inputs /path/to/inputs --outputs /path/to/outputs --ima
 
 `./build_resources.sh` still works and produces the same result, but it needs a POSIX shell. It will be removed once the Python pipeline is validated.
 
+> **Note — a second, unfinished engine exists.** `--engine-kind=python` runs an in-progress Python
+> port of the build pipeline instead of the shell one. Six of its nine steps are implemented; the
+> rest abort with a clear error rather than silently skipping. **It has never completed a real
+> build.** Use the default until this note is removed.
+
 ```bash
 ./build_resources.sh
 ```
