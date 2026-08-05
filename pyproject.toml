@@ -9,6 +9,9 @@ description = "Cross-platform build orchestrator for the DSpico flashcart"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.scripts]
+dspico = "dspico.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
