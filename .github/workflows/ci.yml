@@ -91,3 +91,27 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -e ".[dev]"
       - run: mypy
+
+  mutation:
+    name: mutmut (pure modules)
+    runs-on: ubuntu-latest
+    # Blocking, 100% kill rate. The four modules under [tool.mutmut] are pure
+    # decision logic; a surviving mutant there is a missing test, not noise.
+    # Runs unfiltered: 130 mutants take a couple of seconds.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e ".[dev]"
+      # mutmut 3.7 exits 0 even when mutants survive (verified by deliberately
+      # sabotaging a branch), so the verdict has to come from `mutmut results`.
+      - name: Run mutation testing and fail on survivors
+        run: |
+          mutmut run || true
+          if mutmut results | grep -qi survived; then
+            echo "::error::Surviving mutants in the pure decision modules"
+            mutmut results
+            exit 1
+          fi
+          echo "All mutants killed."

@@ -22,10 +22,15 @@ def pad_rom(data: bytes) -> bytes:
 
     Returns the original object untouched when it is already long enough, so a
     caller can cheaply tell whether padding happened.
+
+    Defers the threshold comparison to ``needs_padding`` rather than repeating
+    it. Duplicating it here left a boundary mutant (``>=`` to ``>``) that no test
+    could kill: at exactly ``SECURE_AREA_END`` the mutated branch falls through
+    to ``data + bytes(0)``, which CPython returns as the very same object.
     """
-    if len(data) >= SECURE_AREA_END:
-        return data
-    return data + bytes(SECURE_AREA_END - len(data))
+    if needs_padding(len(data)):
+        return data + bytes(SECURE_AREA_END - len(data))
+    return data
 
 
 @dataclass(frozen=True)

@@ -42,3 +42,15 @@ files = ["dspico", "tests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.mutmut]
+# Only the pure decision modules are gated. host/ and pipeline/steps/ (PRs 2-3)
+# assemble command strings, which generate many equivalent mutants; a hard gate
+# there would only buy tautological tests. See docs/MUTATION_TESTING.md.
+source_paths = ["dspico"]
+only_mutate = [
+    "dspico/config.py",
+    "dspico/hostenv.py",
+    "dspico/pipeline/plan.py",
+    "dspico/pipeline/rom.py",
+]
