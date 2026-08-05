@@ -1403,6 +1403,29 @@ git commit -m "docs: drop deleted blowfish scripts and record the Python test su
 
 ---
 
+## Deviations, as executed
+
+Recorded after running the plan. Each is a correction the plan was wrong about, not a shortcut.
+
+1. **Python 3.14 added to the CI matrix.** Local development runs 3.14.6, so the planned
+   3.11-3.13 matrix would not have covered the machine the code is written on.
+2. **`ruff` excludes `docs/`.** Current ruff formats Python code blocks *inside markdown*, so
+   `ruff format --check .` tried to rewrite the illustrative snippets in this very plan.
+3. **mutmut config keys were wrong.** mutmut 3.7.0 deprecates `paths_to_mutate` and `tests_dir` in
+   favour of `source_paths` and `only_mutate`. The shipped config uses `source_paths = ["dspico"]`
+   plus an `only_mutate` allowlist, which also stays correct when PRs 2-3 add impure modules.
+4. **The gate does not use mutmut's exit code.** The sabotage step (Task 6, Step 5) earned its
+   keep: with two survivors present, `mutmut run` still exited `0`. The job greps `mutmut results`
+   instead — the contingency the plan wrote down.
+5. **No paths filter on the `mutation` job.** 130 mutants run in about two seconds, and job-level
+   path filtering in GitHub Actions needs a third-party action — new supply-chain surface for no
+   gain.
+6. **`pad_rom` was refactored to call `needs_padding`.** Reaching 100% surfaced one genuinely
+   equivalent mutant (`>=` to `>`): at exactly `SECURE_AREA_END` the mutated branch falls through
+   to `data + bytes(0)`, and CPython returns the original object for concatenation with empty
+   bytes, so even an identity assertion passes. Deleting the duplicated threshold removed the
+   mutant and left the boundary defined in one place.
+
 ## Definition of done
 
 - [ ] `python -m pytest` passes on ubuntu, macos and windows for Python 3.11, 3.12 and 3.13.
