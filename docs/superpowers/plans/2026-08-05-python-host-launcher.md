@@ -1148,6 +1148,25 @@ git commit -m "docs: document the portable python launcher"
 
 ---
 
+## Deviations, as executed
+
+1. **`--dry-run` no longer claims success.** As planned it printed "Finished. Outputs are in …"
+   after executing nothing. It now prints "Dry run: nothing was executed." and skips creating the
+   outputs directory, with a test for each.
+2. **mypy caught a real defect in the plan's own test code.** `test_flags_become_the_env_vars…`
+   passed `**flags: dict[str, bool]` into `BuildConfig`, which also takes `image_name: str`. The
+   parametrisation now passes the three booleans explicitly.
+3. **Task 6's verification covers both engines.** The plan's container check only exercised the
+   host machine (rootless podman), where the container sees `/outputs` as `0:0` and the chown is
+   correctly a no-op. A second in-container case simulates rootful Docker — a mount owned by
+   `1234:5678` holding a root-owned artifact — and confirms the chown moves it. Without that, the
+   case the fix actually exists for would have been reasoned about but never observed.
+4. **One commit had to be split.** `git add compile_resources.sh` swept up 70 lines of
+   pre-existing uncommitted work (the `USE_EDO_FIRMWARE` / edo9300 ntrboot support) into the
+   ownership commit. The branch was local and unpushed, so it was split into `725191b` (that
+   pre-existing work, plus the matching `build_resources.sh` passthrough) and `667daa8` (the
+   ownership fix). The resulting tree was verified byte-identical to the pre-split state.
+
 ## Definition of done
 
 - [ ] `.venv/bin/python -m pytest` passes; the suite grew by roughly 35 tests.
