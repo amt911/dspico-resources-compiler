@@ -111,6 +111,65 @@ This project has **no unit/integration test suite** — it is a shell + Docker b
 
 **Process rule (worth more than any tool): you cannot run the copyrighted-input build yourself, so don't claim the pipeline "works" — claim exactly what you verified** (ShellCheck clean, `docker build` succeeds, syntax parses) and hand the user a precise manual test plan for the full run. Evidence before assertions.
 
+## Real-hardware verification — what no green build can prove
+
+`## Quality beyond coverage` already names the trap ("it ran on my machine") and the answer for the
+scripts (ShellCheck, `set -eu`, `error_exit`, SHA-1 at the boundary). This section names the trap one
+level further out: **a pipeline that exits 0 and writes files is not a bootloader that boots.**
+
+`docker build` succeeding, ShellCheck clean and every `find_artifact` guard passing tell you a file of
+the right name exists at the right path. They tell you nothing about what is *in* it. The artifacts
+here are firmware — a `.nds` bootloader, a `.dldi` driver, a `.uf2` for the Pico. Firmware is verified
+by running it, and nothing in this repo can do that.
+
+**The final gate is a human with hardware.** Write the steps down as a checklist, commit it, and name
+it here. Because the real run needs the user's own copyrighted Blowfish tables and BIOS dumps, the run
+is *handed over*, never claimed.
+
+What "real environment" means here, concretely:
+
+- **A real DS (or DSi/3DS) with the flashcart**, or an emulator that models the hardware — melonDS,
+  no$gba, DeSmuME. An emulator proves the ROM header, the encrypted secure area and the entry point
+  are sane; only the real cart proves DLDI, SD timing and the actual boot chain.
+- **A real Pico**, flashed with the `.uf2`, enumerating over USB and talking to the DS side.
+- **The ntrboot path on real hardware** if it was touched — the `firm-to-nds` conversion produces
+  something the target's boot ROM either accepts or does not. There is no partial credit.
+- **A clean build environment.** `docker build` with a warm layer cache is not a from-scratch build,
+  and the toolchain install steps are exactly where a floating upstream breaks. Prune the cache before
+  believing a green build.
+
+### The names, so you can ask for them by name
+
+| Name | What it means here |
+| --- | --- |
+| **E2E / on-hardware acceptance test** | Flash the produced artifacts and assert on observable behaviour — the DS boots to the launcher, `outputs/dspico/sd_card/` is actually read, the Pico enumerates — never on the build log. The log says a file was written; it says nothing about what is in it. |
+| **Contract test** | Checks that assumptions about things you do not control still hold — and this pipeline is built almost entirely out of them. **Cloned component repos float to their default branch**, so every build depends on someone else's `HEAD`; `DSRomEncryptor` decides where the Blowfish tables and the secure area land; the wonderful/BlocksDS, .NET and Pico SDK layouts move under `wf-pacman`. The `BUILD_INFO.txt` the script already writes per component **is** a contract artifact — it is the first thing to read when a build that used to work stops working. |
+| **Mutation testing** (here: by hand) | Revert the fix, rebuild, confirm the check goes red, restore. There is no unit suite to automate it against, so this is manual — feed a deliberately wrong input and watch the guard fire. **A check that has never failed has not been tested**, and an `error_exit` nobody has seen trigger is decoration, not an assertion. |
+| **State-invariant test** | Asserts a relationship **between two things** no single check owns: the SD layout against the filenames the bootloader actually looks for (`_picoboot.nds` + `_pico/` must be where the boot chain expects them, not merely present); the `BUILD_INFO.txt` commits against the artifacts sitting next to them; a step's globals (`DLDI_FILE`, `BOOTLOADER_NDS`, `ENCRYPTED_NDS`) against what the later step consumes. Each side can be individually fine while the pair is wrong. |
+| **Test pollution / isolation leak** | State that outlives a run and quietly changes the next one: a warm Docker layer cache hiding a broken toolchain step; stale artifacts left in `outputs/` making a skipped step look successful; and above all **the user's copyrighted inputs** — `/inputs` is untrusted, holds BIOS dumps and Blowfish tables, and must never end up in a commit, a log, an image layer or a CI artifact. |
+
+### Rules that came out of real bugs, not theory
+
+- **Prove every guard can fail before you trust it green.** Remove or corrupt an expected input and
+  watch `find_artifact` / `error_exit` fire, then restore. A pipeline exits 0 just as happily when a
+  step was silently skipped as when it succeeded; the guards are the only difference, and an
+  unexercised guard is not one.
+- **Never assert on a count or a size you cannot predict.** "The `.nds` is about 4 MB", "there are 7
+  files under `outputs/`" — both report success against a genuinely broken build as soon as an
+  upstream default branch moves, because the magnitude depends on someone else's repository, not on
+  your bug. Assert the **invariant**: the SD tree contains `_picoboot.nds` and `_pico/` at the paths
+  the boot chain reads; every input matches its known-good SHA-1; a second run over identical inputs
+  produces the same tree; every `BUILD_INFO.txt` names a commit you can look up.
+- **A build stamp must die with the artifacts it describes.** A stale `BUILD_INFO.txt` beside
+  regenerated binaries, or a reused `outputs/` from an earlier upstream revision, makes every later
+  comparison meaningless — no error, no log, and the result looks plausible.
+- **Never let a run leak the user's inputs.** No BIOS dump, Blowfish table or dumped ROM in a commit,
+  a log, an image layer or a CI artifact. Keep the SHA-1 checks: they are how you assert on an input
+  you must not store.
+- **Claim exactly what you verified.** ShellCheck clean, `docker build` succeeds, syntax parses,
+  guards fire on stub inputs — that is a real result, and it is *not* "the pipeline works". Hand the
+  user a precise manual plan for the hardware run and let them report the verdict.
+
 ## Agentic PR verification (MANDATORY on every PR)
 
 **Every PR MUST be verified end-to-end before merge, and the verdict MUST be posted as a PR
