@@ -212,9 +212,13 @@ story — but the decision logic now lives in `dspico/`, which has a real suite.
   Python 3.11-3.14, and needs no Docker, network or toolchain.
 - **`mypy --strict` and `ruff`** — blocking in CI. For typed Python these play the role ShellCheck
   plays for the shell scripts.
-- **`mutmut run`** — mutation testing, gated at 100% killed on `config.py`, `hostenv.py`,
-  `pipeline/plan.py` and `pipeline/rom.py`. **mutmut exits 0 even with survivors**, so read
-  `mutmut results` — see `docs/MUTATION_TESTING.md`.
+- **`scripts/mutation-gate.sh`** — mutation testing, gated at **100% killed** on `config.py`,
+  `hostenv.py`, `pipeline/plan.py` and `pipeline/rom.py`. **mutmut exits 0 even with survivors**, so
+  the verdict comes from `mutmut results`, not from its exit code — see `docs/MUTATION_TESTING.md`.
+  The same script is what `pre-push` and the CI `mutation` job run, so the two cannot drift apart.
+  **The floor the template sets is 60%**; this repo sits at 100% because the four modules are pure
+  decision logic and ~130 mutants take a couple of seconds. That is a ratchet, not a headroom
+  allowance: it goes up or stays, never down to 60 to let a push through.
 
 The shell pipeline is still the only executable build path and is still covered by ShellCheck; it
 has no unit tests by design, and is deleted rather than tested once the Python engine is validated.
@@ -280,7 +284,12 @@ artifact set looks like; the agent implements against it.
 ## CI & hooks
 
 **Policy — cheap, mostly-static checks in CI; the real end-to-end run is the user's local build.**
-There are **no git hooks installed**, so run the local checks yourself before committing.
+
+- **Git hooks** (`.githooks/`) — install once per clone: `git config core.hooksPath .githooks`.
+  - **pre-push** — `pytest`, then `scripts/mutation-gate.sh` (the slow step goes last, and mutating
+    over a red suite tells you nothing). Only the Python side: the shell pipeline has no unit tests
+    by design and its gate is ShellCheck, which CI already runs. Bypass: `git push --no-verify`, and
+    then the breakage is yours.
 
 `.github/workflows/ci.yml` (on push to `main` and on every PR):
 
@@ -290,6 +299,8 @@ There are **no git hooks installed**, so run the local checks yourself before co
 - **`hadolint` — advisory** (`continue-on-error`), pre-existing style findings.
 - **SAST (Semgrep) — advisory** (`continue-on-error`), `--config r/bash`. Note: the `p/bash` registry
   shorthand 404s; `r/bash` is the ruleset that resolves.
+- **`mutation` (mutmut) — BLOCKING**, and unchanged in strictness: `scripts/mutation-gate.sh`, zero
+  survivors on the four pure modules. It is the same command the pre-push hook runs.
 
 Don't grow this into a build pipeline (a real DSpico build needs copyrighted inputs CI can't have)
 without asking.

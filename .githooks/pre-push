@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Puerta local. CI repite lo barato; esto evita que un push salga roto de la máquina.
+#
+# Instalar una vez por clon:  git config core.hooksPath .githooks
+# Bypass de emergencia:       git push --no-verify   (y la rotura es tuya)
+#
+# Dos comprobaciones, dos preguntas distintas:
+#   pytest              ¿pasan los tests, y pasa alguno por el código nuevo?
+#   mutation-gate.sh    ¿ese test verifica algo, o solo lo ejecuta?
+# La segunda hace falta porque la primera es ciega a ella.
+#
+# Solo la parte Python: el pipeline de shell no tiene tests unitarios por diseño y
+# su puerta es ShellCheck, que ya corre en CI.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+[ -f .venv/bin/activate ] && {
+  # shellcheck disable=SC1091
+  . .venv/bin/activate
+}
+
+echo "==> pre-push (1/2): pytest"
+if ! python -m pytest -q; then
+  echo "pre-push: la suite está roja. Bypass: git push --no-verify" >&2
+  exit 1
+fi
+
+# La mutación va la última: es lo más lento, y mutar sobre una suite roja no dice nada.
+echo "==> pre-push (2/2): gate de mutación (cero supervivientes en los módulos puros)"
+if ! scripts/mutation-gate.sh; then
+  echo "pre-push: gate de mutación. Bypass: git push --no-verify" >&2
+  exit 1
+fi
