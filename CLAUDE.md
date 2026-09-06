@@ -200,6 +200,7 @@ skips, a stale artifact being copied forward, or an SD-card layout that's subtly
 - **Never commit copyrighted binaries** — Blowfish tables, BIOS dumps, and WRFU/ntrboot ROMs are user-supplied and must stay out of git. Keep only the `.gitkeep` placeholders under `inputs/*`. `outputs/` is git-ignored — keep it that way.
 - **Keep failures loud** — preserve `error_exit`/existence guards; don't paper over a missing artifact with `|| true`.
 - **Don't break the step contract** — `step_*` functions in `compile_resources.sh` share global state and run in a fixed order; understand the data flow before editing.
+- **Reuse before you write** — grep before adding a function (`grep -n '^[a-z_]*()' *.sh`). The pipeline already owns its primitives — `error_exit`, the existence guards, the clone/build helpers — and a new step composes them instead of pasting its own variant. A copied guard that drifts is how a missing artifact turns into a silent success two steps later. At the third copy, extract it next to the other shared helpers in the same change and migrate the callers.
 
 ## Git & GitHub
 
