@@ -195,7 +195,11 @@ skips, a stale artifact being copied forward, or an SD-card layout that's subtly
 ## Working rules
 
 - **Use superpowers skills whenever they apply** — invoke via `Skill` before acting; process skills before implementation skills.
-- **Don't install packages or add new cloned repos without asking** — the toolchain (wonderful/BlocksDS, .NET 9, ARM GCC) and the set of upstream component repos are intentional. New `apt` packages, `wf-pacman` packages, or `git clone` sources change the supply-chain surface.
+- **New packages or cloned repos: ask first, then add** — adding an `apt` package, a `wf-pacman`
+  package or a new `git clone` source is allowed when the task genuinely needs it, but ask before
+  adding it (what, why) and wait for the go-ahead: it changes the supply-chain surface. The
+  toolchain (wonderful/BlocksDS, .NET 9, ARM GCC) and the set of upstream component repos are
+  intentional.
 - **Lint before committing** — ShellCheck on any edited `.sh`, `bash -n` syntax check, and `docker build` if the Dockerfile or pipeline changed.
 - **Never commit copyrighted binaries** — Blowfish tables, BIOS dumps, and WRFU/ntrboot ROMs are user-supplied and must stay out of git. Keep only the `.gitkeep` placeholders under `inputs/*`. `outputs/` is git-ignored — keep it that way.
 - **Keep failures loud** — preserve `error_exit`/existence guards; don't paper over a missing artifact with `|| true`.
