@@ -6,6 +6,24 @@ Run `/graphify` before each session. The persistent graph at `graphify-out/graph
 
 This repo is a **Docker-based build orchestrator**, not an application. It clones and compiles all the separate DSpico components (DLDI driver, bootloader, ROM encryptor, firmware, loader, launcher) inside a reproducible container and assembles a ready-to-copy SD card layout in `outputs/`. Almost all the logic lives in two POSIX/bash scripts and a `Dockerfile` — there is no compiled source of its own.
 
+## Agent compatibility — Codex and Claude Code
+
+This file is `AGENTS.md`: the **one** instruction file for every coding agent in this repo. Codex reads it directly; Claude Code reads `CLAUDE.md`, which only imports this file (`@AGENTS.md`) and holds what applies to Claude alone. **Edit rules here, never in `CLAUDE.md`** — two copies of a rule drift apart on the first edit, and each agent then obeys a different one.
+
+| Concern | Claude Code | Codex |
+| --- | --- | --- |
+| Instruction file | `CLAUDE.md` → imports `AGENTS.md` | `AGENTS.md` (root down to the working directory) |
+| Invoke a skill | `Skill` tool, or `/<skill>` | mention it (`$<skill>`), or let it trigger from its description |
+| Skills on disk | `~/.claude/skills` (links into `~/.agents/skills`) | `.agents/skills`, then `~/.agents/skills` |
+| superpowers | `superpowers@claude-plugins-official` (`/plugin install`) | `superpowers@openai-curated` (install from `/plugins`; that id is its key in `~/.codex/config.toml`) |
+| MCP servers | `claude mcp add -s user <name> -- <cmd>` | `codex mcp add <name> -- <cmd>` (`~/.codex/config.toml`) |
+| File size | imports load whole | `project_doc_max_bytes`, **32 KiB by default** — raise it when this file is bigger, or the tail is silently dropped |
+
+- **Install shared skills once, for both agents:** `npx skills add <owner/repo> -g --skill <name>` writes to `~/.agents/skills` and links it for Claude Code, so both run the same version.
+- **Names in this file are capabilities, not one agent's syntax.** "Invoke the `X` skill" means the `Skill` tool in Claude Code and a skill mention in Codex. An MCP server named here is used when it is registered for the agent you are running in; its absence never blocks ordinary work.
+- **Modes, model caps and Git rules bind both agents.** "lite mode", "normal mode" and "modo desatendido" mean the same in Codex; a cap written as "no model above Sonnet" means "no model above the mid tier" there.
+- **Claude-only commands** (`/graphify` and other slash commands that are not skills) are skipped by Codex unless the same capability is installed as a skill in `~/.agents/skills`.
+
 ## ⚡ graphify — use every session
 
 ```
@@ -190,7 +208,54 @@ skips, a stale artifact being copied forward, or an SD-card layout that's subtly
 - **Two layers.** Deterministic checks (ShellCheck, `bash -n`, `docker build`) stay the hard merge
   gate; the agentic pass is advisory and never vetoes a merge on its own — but running it and
   posting the verdict comment is mandatory.
+- **The verdict reads structure too.** Besides exercising the changed `step_*` function(s), it names
+  what the diff does to the [Design principles](#design-principles--solid-applied-with-judgement): a
+  `step_*` growing a second reason to change, or a guard pasted instead of reused from the shared
+  helpers. Findings, not a veto — like the rest of the pass.
 - **Hard limits.** The verdict awaits your close; the agent never merges.
+
+## Design principles — SOLID, applied with judgement
+
+SOLID is a list of **symptoms to look for**, not a pattern to apply. Every one of the five exists to
+keep a change local: the useful question is *how many files does the next plausible change touch, and
+how many of them do you have to understand first?* Applied by rote it produces the opposite — an
+interface per class, a factory for one product, an eight-file feature — so here it is bounded by YAGNI
+and by the repo's own **Reuse before you write** rule (see *Working rules*).
+
+| Principle | Checkable smell | Usual fix |
+| --- | --- | --- |
+| **S — Single responsibility**: one reason to change | the description needs "and"; the file changes in PRs about unrelated features; a test mocks things unrelated to what it asserts; a component both fetches and lays out | split along the reason to change — IO, decision, presentation |
+| **O — Open/closed**: extend without editing | adding a case edits a growing `switch`/`if` chain in several places; one boolean prop per variant | a variants map, strategy, slot or registry — introduced at the second real case, not the first |
+| **L — Liskov substitution**: subtypes keep the contract | an override throws "not supported"; callers check the concrete type before calling; a variant drops the base's disabled, focus or semantics | narrow the base contract, or stop inheriting and compose |
+| **I — Interface segregation**: clients see only what they use | a fake implements methods the test never calls; a whole entity is passed to read two fields; a `Service` with fifteen methods | split by client need; pass the fields, not the bag |
+| **D — Dependency inversion**: policy does not import mechanism | domain or UI code imports `fetch`, the ORM, Retrofit, `Date.now()` or `fs` directly; a unit test needs a network or a database | depend on a port the caller owns (interface, function, hook); wire the adapter at the edge |
+
+### Where the seams go, per stack
+
+| Stack | Seams |
+| --- | --- |
+| Shell | one function per job; side effects (`rm`, package managers, network) isolated in named functions a dry-run flag can skip |
+
+This repo is 100% shell (`build_resources.sh`, `compile_resources.sh`) — the `step_*` functions
+already are the seams: each owns one build stage, shares state through a small set of named globals
+(`DLDI_FILE`, `BOOTLOADER_NDS`, `ENCRYPTED_NDS`, `ENCRYPTOR_BIN`, …), and delegates side effects to the
+named helpers (`clone_repo`, `build`, `find_artifact`, `write_build_info`, `copy_glob`,
+`copy_if_exists`, `encrypt_rom`). Python only enters as a runtime the Docker image installs for a
+*cloned* upstream tool (`firm-to-nds`) — this repo carries no Python source of its own, so the table
+above has only the Shell row.
+
+### Where SOLID stops
+
+- **No new function, wrapper or indirection layer without one of:** a second real caller, an IO
+  boundary (network, filesystem, clone, encryption), or a guard that cannot be written without the
+  seam. "We might need it later" is not on the list.
+- **Reuse first beats speculative extension points** — add the parameter to the existing `step_*` or
+  helper before inventing a new abstraction over it (see **Reuse before you write** in *Working
+  rules*).
+- **Speculative abstraction is a review finding**, exactly like a violation: a wrapper around one
+  helper with no second caller and no IO behind it gets inlined.
+- **Refactor toward SOLID when a change hurts**, in the PR that felt the pain — not as a drive-by
+  rewrite of `step_*` functions nobody is changing.
 
 ## Working rules
 
@@ -205,6 +270,10 @@ skips, a stale artifact being copied forward, or an SD-card layout that's subtly
 - **Keep failures loud** — preserve `error_exit`/existence guards; don't paper over a missing artifact with `|| true`.
 - **Don't break the step contract** — `step_*` functions in `compile_resources.sh` share global state and run in a fixed order; understand the data flow before editing.
 - **Reuse before you write** — grep before adding a function (`grep -n '^[a-z_]*()' *.sh`). The pipeline already owns its primitives — `error_exit`, the existence guards, the clone/build helpers — and a new step composes them instead of pasting its own variant. A copied guard that drifts is how a missing artifact turns into a silent success two steps later. At the third copy, extract it next to the other shared helpers in the same change and migrate the callers.
+- **SOLID where it pays, not by rote** — split a `step_*` function by reason to change, extend
+  through a new named helper rather than another inline branch, and keep guards honest. No new
+  wrapper without a second caller, an IO boundary or a guard that needs the seam. See
+  [Design principles](#design-principles--solid-applied-with-judgement).
 
 ## Git & GitHub
 
