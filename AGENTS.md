@@ -1,4 +1,4 @@
-# DSpico Resources Compiler — Claude Guide
+# DSpico Resources Compiler — Agent Guide
 
 ## Start here
 
